@@ -1,0 +1,1 @@
+default_app_config = 'ext_auth.apps.ExtAuthConfig'

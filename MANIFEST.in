@@ -1,0 +1,5 @@
+include LICENSE
+include README.rst
+recursive-include tacapi/static *
+recursive-include tacapi/templates *
+recursive-include docs *
