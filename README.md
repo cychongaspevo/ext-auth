@@ -25,18 +25,19 @@ Installation
 
 1. Install using pip
 
-    pip install ext-auth 
+    `pip install ext-auth`
 
 Usage
 -----
 
-1. Add "ext_auth" to your INSTALLED_APPS.
-
-    INSTALLED_APPS = [
-        ...
-        'ext_auth',
-    ]
+1. Add `ext_auth` to your INSTALLED_APPS.
+    
+    > INSTALLED_APPS = [
+    >   ...
+    >   'ext_auth',
+    > ]
+    
 
 2. Run `python manage.py migrate` to create the ext_auth models.
 
-** The register and login Apiview sample is under 'ext_auth.rest-framework.firebase'
+** The register and login Apiview sample is under `ext_auth.rest-framework.firebase`

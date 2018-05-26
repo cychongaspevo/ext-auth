@@ -14,3 +14,10 @@ ext_auth.egg-info/SOURCES.txt
 ext_auth.egg-info/dependency_links.txt
 ext_auth.egg-info/requires.txt
 ext_auth.egg-info/top_level.txt
+ext_auth/migrations/0001_initial.py
+ext_auth/migrations/__init__.py
+ext_auth/rest_framework/__init__.py
+ext_auth/rest_framework/exceptions.py
+ext_auth/rest_framework/firebase.py
+ext_auth/rest_framework/mixins.py
+ext_auth/rest_framework/serializers.py

@@ -10,8 +10,9 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='ext_auth',
-    version='0.1.2',
+    version='0.1.3',
     packages=['ext_auth'],
+    package_data={'migrations': ['*'], 'rest_framework':['*']},
     include_package_data=True,
     license='BSD License',  # example license
     description='A simple Django app register and login via 3rd party Auth',
