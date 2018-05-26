@@ -1,6 +1,6 @@
 LICENSE
 MANIFEST.in
-README.rst
+README.md
 setup.py
 ext_auth/__init__.py
 ext_auth/admin.py

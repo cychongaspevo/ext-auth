@@ -2,22 +2,23 @@
 import os
 from setuptools import setup
 
-with open(os.path.join(os.path.dirname(__file__), 'README.rst')) as readme:
-    README = readme.read()
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
 # allow setup.py to be run from any path
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='ext_auth',
-    version='0.1',
+    version='0.1.2',
     packages=['ext_auth'],
     include_package_data=True,
     license='BSD License',  # example license
     description='A simple Django app register and login via 3rd party Auth',
-    long_description=README,
+    long_description_content_type="text/markdown",
+    long_description=long_description,
     url='https://github.com/cychongaspevo/ext-auth.git',
-    author='Sola1412',
+    author='notfair',
     author_email='cy.chong@aspevo.com',
     classifiers=[
         'Environment :: Web Environment',
