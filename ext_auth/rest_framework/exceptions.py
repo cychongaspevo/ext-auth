@@ -2,7 +2,7 @@ from rest_framework.exceptions import APIException, ValidationError
 from rest_framework import status
 
 class APIErrorException(APIException):
-    status_code = 200
+    status_code = 400
     default_detail = 'A server error occurred.'
 
     def __init__(self, detail=None, status_code=None, field="error"):

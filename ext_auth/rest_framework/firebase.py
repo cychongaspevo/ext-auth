@@ -34,6 +34,8 @@ class FirebaseMixin(ErrorMixin):
     id_token = None
     
     #get 
+    def get_expire_seconds(self):
+        return oauth2_settings.ACCESS_TOKEN_EXPIRE_SECONDS
     def get_ext_user_by_decoded_token(self, decoded_token):
         uid = decoded_token.get('uid', None)
         ext_user = ExternalUserIdentifier.objects.filter(uid=uid).first()
@@ -95,11 +97,21 @@ class FirebaseMixin(ErrorMixin):
         oauth_app = Application.objects.filter(client_id=client_id).first()
 
         return oauth_app
+        
+    def get_remove_old_token(self):
+        return True
 
     def create_oauth2_token(self, user, client_id):
         oauth_app = self.get_oauth2_app_by_client_id(client_id)
+        
+        remove_old_token = self.get_remove_old_token()
 
-        expires = timezone.now() + timedelta(seconds=oauth2_settings.ACCESS_TOKEN_EXPIRE_SECONDS)
+        if remove_old_token is True:
+            AccessToken.objects.filter(user=user, application=oauth_app).delete()
+
+        expire_seconds = self.get_expire_seconds()
+
+        expires = timezone.now() + timedelta(seconds=expire_seconds)
         scopes = oauth2_settings.DEFAULT_SCOPES
         access_token = AccessToken(
             user=user,
@@ -122,7 +134,7 @@ class FirebaseMixin(ErrorMixin):
             "access_token": access_token.token,
             "refresh_token": refresh_token.token,
             "token_type": "Bearer",
-            "expires_in": oauth2_settings.ACCESS_TOKEN_EXPIRE_SECONDS,
+            "expires_in": expire_seconds,
             "scope": scopes,
             "user_id": user.id,
         }
