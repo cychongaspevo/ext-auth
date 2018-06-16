@@ -18,6 +18,10 @@ class ErrorMixin(object):
         error = {'code':104, 'description':err_msg}
         raise APIErrorException(error)
 
-    def error_firebase_admin(self, err_msg='firebase admin error'):
-        error = {'code':121, 'description':err_msg}
+    def error_firebase_admin(self, err_msg='firebase admin error', details=None):
+        error = {
+            'code':121,
+            'description':err_msg}
+        if details:
+            error['details'] = details
         raise APIErrorException(error)

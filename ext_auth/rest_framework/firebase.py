@@ -1,3 +1,4 @@
+import json
 import operator
 import functools
 from datetime import timedelta
@@ -29,13 +30,15 @@ cred = credentials.Certificate(ext_auth_settings.FIREBASE_ADMIN_CERT)
 default_app = firebase_admin.initialize_app(cred)
 
 #### Firebase View
-class FirebaseMixin(ErrorMixin):
+## Auth
+class FirebaseAuthMixin(ErrorMixin):
     decoded_token = None
     id_token = None
     
     #get 
     def get_expire_seconds(self):
         return oauth2_settings.ACCESS_TOKEN_EXPIRE_SECONDS
+    
     def get_ext_user_by_decoded_token(self, decoded_token):
         uid = decoded_token.get('uid', None)
         ext_user = ExternalUserIdentifier.objects.filter(uid=uid).first()
@@ -75,7 +78,7 @@ class FirebaseMixin(ErrorMixin):
         try:
             decoded_token = auth.verify_id_token(id_token, app=default_app)
         except Exception as e:
-            err_msg = "{0}".format(e)
+            err_msg = "[firebase] {0}".format(e)
             self.error_firebase_admin(err_msg)
 
         self.decoded_token = decoded_token
@@ -92,25 +95,40 @@ class FirebaseMixin(ErrorMixin):
 
         return username
     
+    def get_email_from_decode_token(self, decoded_token):
+        email = decoded_token.get('email', None)
+
+        if not email:
+            provider_info = decoded_token.get('providerUserInfo', [])
+            for info in provider_info:
+                email = info.get('email', None)
+                if email:
+                    break
+                
+        return email
     def get_oauth2_app_by_client_id(self, client_id):
         Application = get_application_model()
         oauth_app = Application.objects.filter(client_id=client_id).first()
 
         return oauth_app
-        
-    def get_remove_old_token(self):
-        return True
 
-    def create_oauth2_token(self, user, client_id):
+    def get_remove_old_token(self):
+        return False
+
+    def create_oauth2_token(self, user, client_id, old_token=None):
         oauth_app = self.get_oauth2_app_by_client_id(client_id)
         
         remove_old_token = self.get_remove_old_token()
 
         if remove_old_token is True:
+            #this field to remove all token associate with this user and the application
             AccessToken.objects.filter(user=user, application=oauth_app).delete()
+        
+        if old_token:
+            AccessToken.objects.filter(user=user, token=old_token).delete()
 
         expire_seconds = self.get_expire_seconds()
-
+        
         expires = timezone.now() + timedelta(seconds=expire_seconds)
         scopes = oauth2_settings.DEFAULT_SCOPES
         access_token = AccessToken(
@@ -158,8 +176,7 @@ class FirebaseMixin(ErrorMixin):
             defaults={'platform': 'firebase'},
         )
 
-
-class RegisterUserApiView(APIView, FirebaseMixin):
+class RegisterUserApiView(APIView, FirebaseAuthMixin):
     serializer = UserSerializer
     
     def post(self, request):
@@ -246,10 +263,30 @@ class RegisterUserTokenApiView(RegisterUserApiView):
         user = self.perform_create(request, decoded_token)
         
         #create token
-        token_results = self.create_oauth2_token(user, client_id)
+        token_results = self.create_oauth2_token(user, client_id, request.data.get('old_token', None))
         return Response(token_results)
 
-class LoginUserApiView(APIView, FirebaseMixin):
+class LoginUserApiView(APIView, FirebaseAuthMixin):
+    def get_auto_create(self):
+        return True
+    
+    def create_user_by_decoded_token(self, decoded_token):
+        username = self.get_username_from_decode_token(decoded_token)
+        email = self.get_email_from_decode_token(decoded_token)
+        display_name = decoded_token.get('name', "")
+        phone = decoded_token.get('phone_number', "")
+        
+        #create user
+        user = User.objects.create(
+            username=username,
+            first_name=display_name,
+            last_name="",
+            email=email
+        )
+        #link user
+        self.link_user_with_ext(user, decoded_token)
+        return user
+
     def get(self, request):
         return Response({'description':'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -275,16 +312,105 @@ class LoginUserApiView(APIView, FirebaseMixin):
         # get user from using decoded_token, email, phone_num or other id
         if not user:
             user = self.get_user_by_decoded_token(decoded_token)
-
-        # if still no user, raise error
+        
         if not user:
-            self.error_object_not_found('There is no user corresponding to this identifier.')
+            if self.get_auto_create() is False:
+                self.error_object_not_found('There is no user corresponding to this identifier.')
+            else:
+                # create user use decoded_token
+                user = self.create_user_by_decoded_token(decoded_token)
         else:
             # user found, do extra stuff
             if self.get_auto_link() is True:
                 self.link_user_with_ext(user, decoded_token)
         
         #create token
-        token_results = self.create_oauth2_token(user, client_id)
+        token_results = self.create_oauth2_token(user, client_id, request.data.get('old_token', None))
 
         return Response(token_results)
+
+## Firebase Functions
+class FirebaseUserMixin(ErrorMixin):
+    pass
+        
+class GetUserApiView(APIView, FirebaseUserMixin):
+    def get(self, request, *args, **kwargs):
+        uid = request.query_params.get('uid', None)
+        email = request.query_params.get('email', None)
+        phone = request.query_params.get('phone', None)
+        
+        if not uid and not email and not phone:
+            self.error_missing_field()
+
+        user_record = None
+        try:
+            if email:
+                user_record = firebase_admin.auth.get_user_by_email(email)
+                
+            elif phone:
+                user_record = firebase_admin.auth.get_user_by_phone_number(phone)
+            else:
+                user_record = firebase_admin.auth.get_user(uid)
+        except ValueError as e:
+            self.error_firebase_admin('firebase error', "{}".format(e))
+        except firebase_admin.auth.AuthError as e:
+            cause = e.detail
+            if cause:
+                error = json.loads(cause.response._content)
+                raise APIErrorException(error.get('error'), 400)
+            else:
+                self.error_firebase_admin('firebase error', "{}".format(e))
+
+        result = {
+            'data': {}
+        }
+
+        if user_record:
+            result['data'] = user_record._data
+
+        return Response(result)
+        
+    def post(self, request, *args, **kwargs):
+        return Response({'description':'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+class CreateUserApiView(APIView, FirebaseUserMixin):
+    def get(self, request, *args, **kwargs):
+        return Response({'description':'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        
+    def post(self, request, *args, **kwargs):
+        display_name = request.data.get('display_name', None)
+        email = request.data.get('email', None)
+        phone_number = request.data.get('phone_number', None)
+        password = request.data.get('password', None)
+        disabled = request.data.get('disabled', False)
+
+        if not email or not password:
+            self.error_missing_field()
+
+        payload = {
+            'email': email,
+            'password': password,
+        }
+
+        if display_name:
+            payload['display_name'] = display_name
+        
+        if phone_number:
+            payload['phone_number'] = phone_number
+
+        try:
+            user_record = firebase_admin.auth.create_user(**payload)
+        
+        except ValueError as e:
+            self.error_firebase_admin('firebase error', "{}".format(e))
+        except auth.AuthError as e:
+            cause = e.detail
+            error = json.loads(cause.response._content)
+            err_msg = error.get('message', None)
+            if err_msg and not err_msg == 'EMAIL_EXISTS':
+                raise APIErrorException(error.get('error'), 400)
+
+        user_record = firebase_admin.auth.get_user_by_email(email)
+        
+        return Response(user_record._data)
+    
