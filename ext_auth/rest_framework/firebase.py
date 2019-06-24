@@ -270,6 +270,9 @@ class LoginUserApiView(APIView, FirebaseAuthMixin):
     def get_auto_create(self):
         return True
     
+    def get_extra_data(self, user, data={}, is_auto_create=False):
+        return data
+
     def create_user_by_decoded_token(self, decoded_token):
         username = self.get_username_from_decode_token(decoded_token)
         email = self.get_email_from_decode_token(decoded_token)
@@ -312,13 +315,14 @@ class LoginUserApiView(APIView, FirebaseAuthMixin):
         # get user from using decoded_token, email, phone_num or other id
         if not user:
             user = self.get_user_by_decoded_token(decoded_token)
-        
+        is_auto_create = False
         if not user:
             if self.get_auto_create() is False:
                 self.error_object_not_found('There is no user corresponding to this identifier.')
             else:
                 # create user use decoded_token
                 user = self.create_user_by_decoded_token(decoded_token)
+                is_auto_create = True
         else:
             # user found, do extra stuff
             if self.get_auto_link() is True:
@@ -326,8 +330,8 @@ class LoginUserApiView(APIView, FirebaseAuthMixin):
         
         #create token
         token_results = self.create_oauth2_token(user, client_id, request.data.get('old_token', None))
-
-        return Response(token_results)
+        payload_results = self.get_extra_data(user, token_results, is_auto_create)
+        return Response(payload_results)
 
 ## Firebase Functions
 class FirebaseUserMixin(ErrorMixin):
