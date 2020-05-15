@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: ext-auth
-Version: 0.1.16
+Version: 0.1.17
 Summary: A simple Django app register and login via 3rd party Auth
 Home-page: https://github.com/cychongaspevo/ext-auth.git
 Author: notfair

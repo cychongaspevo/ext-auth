@@ -107,6 +107,7 @@ class FirebaseAuthMixin(ErrorMixin):
                     break
                 
         return email
+    
     def get_oauth2_app_by_client_id(self, client_id):
         Application = get_application_model()
         oauth_app = Application.objects.filter(client_id=client_id).first()
@@ -273,7 +274,7 @@ class LoginUserApiView(APIView, FirebaseAuthMixin):
     
     def get_extra_data(self, user, data={}, is_auto_create=False):
         return data
-
+    
     def create_user_by_decoded_token(self, decoded_token):
         username = self.get_username_from_decode_token(decoded_token)
         email = self.get_email_from_decode_token(decoded_token)
@@ -328,7 +329,7 @@ class LoginUserApiView(APIView, FirebaseAuthMixin):
             # user found, do extra stuff
             if self.get_auto_link() is True:
                 self.link_user_with_ext(user, decoded_token)
-        
+
         #create token
         token_results = self.create_oauth2_token(user, client_id, request.data.get('old_token', None))
         payload_results = self.get_extra_data(user, token_results, is_auto_create)
